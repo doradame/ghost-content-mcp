@@ -1,0 +1,40 @@
+# Example: run ghost-content-mcp against your own Ghost site.
+#   1. cp .env.example .env   and set GHOST_URL + GHOST_CONTENT_API_KEY
+#   2. docker compose up -d
+#   3. point your MCP client / chatbot at http://<host>:3000/mcp
+#
+# This runs only the MCP server — it talks to a Ghost you already have (self-hosted or Ghost-Pro),
+# reached via GHOST_URL in your .env.
+
+services:
+  ghost-content-mcp:
+    build: .
+    # Once a prebuilt image is published you can drop `build:` and use it instead:
+    # image: ghcr.io/doradame/ghost-content-mcp:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "3000:3000"
+    # The index rebuild loads an embeddings model and can spike RAM; cap it so a runaway
+    # never takes the host down (a cgroup OOM restarts only this container).
+    mem_limit: 2g
+    memswap_limit: 3g
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s   # first boot warms the embeddings model + builds the index (~20-30s)
+
+# If your Ghost runs in another compose project on its own Docker network, connect this
+# service to it instead of using a public GHOST_URL, e.g.:
+#
+#   services:
+#     ghost-content-mcp:
+#       networks: [ghost-net]
+#   networks:
+#     ghost-net:
+#       external: true
+#       name: <your-ghost-project>_default
+#
+# ...then set GHOST_URL=http://<ghost-service-name>:2368 in .env.

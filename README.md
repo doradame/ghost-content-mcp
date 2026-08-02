@@ -44,6 +44,14 @@ docker build -t ghost-content-mcp .
 docker run -p 3000:3000 --env-file .env ghost-content-mcp
 ```
 
+Or with Docker Compose (see [`docker-compose.yml`](docker-compose.yml) — includes a memory
+cap and healthcheck):
+
+```bash
+cp .env.example .env      # set GHOST_URL + GHOST_CONTENT_API_KEY
+docker compose up -d
+```
+
 The MCP endpoint is `POST /mcp` (Streamable HTTP, stateless JSON). `GET /health` reports index
 status.
 
