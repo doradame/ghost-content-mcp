@@ -20,8 +20,9 @@ describe('extractRepos', () => {
   });
 
   it('ignores reserved github paths (sponsors, marketplace, ...)', () => {
-    const html = 'https://github.com/sponsors/doradame and https://github.com/marketplace/actions/x';
-    expect(extractRepos(html, [])).toEqual([]);
+    const html = 'https://github.com/sponsors/acme and https://github.com/marketplace/actions/x and https://github.com/acme/real';
+    // sponsors/marketplace are reserved owners → dropped even though allow-listed
+    expect(extractRepos(html, ['sponsors', 'marketplace', 'acme'])).toEqual([{ owner: 'acme', name: 'real' }]);
   });
 
   it('extracts the repo even when the link points at a subpath (issues, blob)', () => {
@@ -29,9 +30,9 @@ describe('extractRepos', () => {
     expect(extractRepos(html, ['doradame'])).toEqual([{ owner: 'doradame', name: 'repo' }]);
   });
 
-  it('with no owner filter, accepts any owner', () => {
-    const html = 'https://github.com/foo/bar';
-    expect(extractRepos(html, [])).toEqual([{ owner: 'foo', name: 'bar' }]);
+  it('with no owner allowlist, the companion feature is off (indexes no repos)', () => {
+    const html = 'https://github.com/foo/bar and https://github.com/baz/qux';
+    expect(extractRepos(html, [])).toEqual([]);
   });
 });
 

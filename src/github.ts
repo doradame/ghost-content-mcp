@@ -23,6 +23,9 @@ const NON_REPO_NAMES = new Set(['blob', 'tree', 'releases', 'issues', 'pull', 'w
 /** Extract unique repo refs from HTML, keeping only owners in `owners` (case-insensitive). */
 export function extractRepos(html: string, owners: string[]): RepoRef[] {
   const allow = new Set(owners.map((o) => o.toLowerCase()));
+  // Companion repos are opt-in: with no owner allowlist the feature is OFF (index none),
+  // rather than indexing every third-party repo an article happens to link.
+  if (allow.size === 0) return [];
   const re = /https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)/g;
   const seen = new Set<string>();
   const out: RepoRef[] = [];
