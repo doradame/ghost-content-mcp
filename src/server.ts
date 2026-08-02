@@ -6,7 +6,7 @@ import {
 } from './ghost.js';
 import { htmlToMarkdown } from './markdown.js';
 import { extractRepos } from './github.js';
-import { IndexStore, Doc, SearchHit } from './store.js';
+import { IndexStore, Hit, SearchHit } from './store.js';
 import { SiteInfo } from './config.js';
 
 export interface ServerOpts { owners: string[]; site: SiteInfo }
@@ -29,20 +29,23 @@ function truncate(s: string, len: number): string {
   return (sp > len * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + '…';
 }
 
-function excerptOf(d: Doc, len: number): string {
-  const src = len > d.excerpt.length && d.text ? d.text : d.excerpt || d.text;
+function excerptOf(d: Hit, len: number): string {
+  // For a chunk hit, show the matching section's text; for a whole-doc hit, prefer the excerpt.
+  const src = d.heading ? d.text : (len > d.excerpt.length && d.text ? d.text : d.excerpt || d.text);
   return truncate(src, len);
 }
 
 function fmtHit(h: SearchHit, len: number, withType: boolean): string {
   const d = h.doc;
   const prefix = withType ? `[${d.type}] ` : '';
+  const section = d.heading ? ` › ${d.heading}` : '';
+  const link = d.anchor ? `${d.url}#${d.anchor}` : d.url; // deep-link to the matching section
   const meta = d.type === 'repo'
     ? (d.articles?.length ? ` — companion of: ${d.articles.map((a) => a.slug).join(', ')}` : '')
     : ` — ${fmtDate(d.published_at)}${d.tags.length ? ` — tags: ${d.tags.join(', ')}` : ''}`;
   const rel = ` — relevance: ${h.relevance.toFixed(2)}`;
   const ex = excerptOf(d, len);
-  return `- ${prefix}**${d.title}** (slug: ${d.slug}, url: ${d.url})${meta}${rel}${ex ? `\n  ${ex}` : ''}`;
+  return `- ${prefix}**${d.title}**${section} (slug: ${d.slug}, url: ${link})${meta}${rel}${ex ? `\n  ${ex}` : ''}`;
 }
 
 function fmtFull(p: PostFull, companions: string[]): string {

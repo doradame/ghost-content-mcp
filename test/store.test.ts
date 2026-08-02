@@ -114,3 +114,48 @@ describe('IndexStore', () => {
     expect(s).toContain('https://test.example');
   });
 });
+
+describe('IndexStore chunking (heading-aware)', () => {
+  const guide = {
+    title: 'Long Guide', slug: 'long-guide', excerpt: 'A guide', custom_excerpt: 'A guide',
+    plaintext: 'intro quantization paging',
+    html: '<p>Intro to the guide.</p>' +
+      '<h2 id="quantization">Quantization</h2><p>Shrink weights to four bits to fit tiny vram.</p>' +
+      '<h2 id="paging">Paging</h2><p>PagedAttention manages the kv cache like virtual memory paging.</p>',
+    published_at: '2026-07-01T00:00:00.000Z', url: 'https://test.example/long-guide/',
+    tags: [{ name: 'AI', slug: 'ai' }],
+  };
+  function guideFetch(url: string) {
+    if (url.includes('/ghost/api/content/posts/')) return Promise.resolve(jsonRes({ posts: [guide], meta: {} }));
+    if (url.includes('/ghost/api/content/pages/')) return Promise.resolve(jsonRes({ pages: [], meta: {} }));
+    if (url.includes('/ghost/api/content/tags/')) return Promise.resolve(jsonRes({ tags: [] }));
+    return Promise.resolve(new Response('', { status: 404 }));
+  }
+  beforeEach(() => { vi.stubGlobal('fetch', vi.fn(guideFetch)); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const zero = () => new Float32Array(8);
+  const mk = () => new IndexStore(cfg, { owners: [], embed: async (t) => t.map(zero), embedOne: async () => zero() });
+
+  it('returns the matching SECTION with its heading and deep-link anchor', async () => {
+    const hits = await mk().search('paging virtual memory kv cache', { type: 'posts' });
+    expect(hits[0].doc.slug).toBe('long-guide');
+    expect(hits[0].doc.heading).toBe('Paging');
+    expect(hits[0].doc.anchor).toBe('paging');
+    expect(hits[0].doc.text.toLowerCase()).toContain('virtual memory');
+  });
+
+  it('a different query surfaces a different section of the same doc', async () => {
+    const hits = await mk().search('quantization four bits vram', { type: 'posts' });
+    expect(hits[0].doc.heading).toBe('Quantization');
+    expect(hits[0].doc.anchor).toBe('quantization');
+  });
+
+  it('indexes more chunks than docs when a doc has headings', async () => {
+    const store = mk();
+    await store.search('quantization', { type: 'posts' });
+    const s = store.stats();
+    expect(s.docs).toBe(1);
+    expect(s.chunks).toBeGreaterThan(1); // intro + 2 sections
+  });
+});
